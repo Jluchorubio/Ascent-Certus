@@ -42,6 +42,7 @@ type MateriaApi = {
   descripcion?: string | null;
   icono?: string | null;
   color?: string | null;
+  activa?: boolean;
 };
 
 type Cuestionario = {
@@ -63,6 +64,32 @@ type Pregunta = {
   nivel: 'FACIL' | 'MEDIO' | 'ALTO';
   subtema?: string | null;
   opciones: Opcion[];
+};
+
+type OpcionAdmin = {
+  id: number;
+  texto: string;
+  correcta: boolean;
+};
+
+type PreguntaAdmin = {
+  id: string;
+  enunciado: string;
+  nivel: 'FACIL' | 'MEDIO' | 'ALTO';
+  subtema?: string | null;
+  opciones: OpcionAdmin[];
+  activa: boolean;
+};
+
+type CuestionarioAdmin = {
+  id: string;
+  materia_id: string;
+  nombre: string;
+  cantidad_preguntas: number;
+  tiempo_minutos: number;
+  activo: boolean;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
 };
 
 type SesionPayload = {
@@ -193,9 +220,7 @@ const LandingPage = ({ onLoginClick }: LandingPageProps) => (
           de manera completamente gratuita. ¡Mejora tu futuro hoy!
         </p>
         <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-          <Button variant="secondary" onClick={onLoginClick}>
-            Iniciar Sesión
-          </Button>
+          <Button onClick={onLoginClick}>Iniciar Sesión</Button>
         </div>
       </div>
       <div className="flex-1 relative">
@@ -552,6 +577,20 @@ const iconForMateria = (materia: MateriaApi) => {
   return <BarChart3 className="w-5 h-5" />;
 };
 
+const parseOpcionesAdmin = (raw: unknown): OpcionAdmin[] => {
+  if (Array.isArray(raw)) {
+    return raw as OpcionAdmin[];
+  }
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as OpcionAdmin[];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 const levelCopy: Record<ResultadoSesion['nivelFinal'], { title: string; desc: string }> = {
   ALTO: {
     title: 'Nivel Alto',
@@ -593,11 +632,46 @@ export default function App() {
   const [resultData, setResultData] = useState<FinishPayload | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [twoFaError, setTwoFaError] = useState<string | null>(null);
+  const [adminError, setAdminError] = useState<string | null>(null);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [chartFilter, setChartFilter] = useState<string | null>(null);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+
+  const [adminTab, setAdminTab] = useState<'materias' | 'preguntas' | 'cuestionarios'>('materias');
+  const [adminMaterias, setAdminMaterias] = useState<MateriaApi[]>([]);
+  const [adminSelectedMateriaId, setAdminSelectedMateriaId] = useState<string>('');
+  const [adminPreguntas, setAdminPreguntas] = useState<PreguntaAdmin[]>([]);
+  const [adminCuestionarios, setAdminCuestionarios] = useState<CuestionarioAdmin[]>([]);
+  const [materiaEditingId, setMateriaEditingId] = useState<string | null>(null);
+  const [materiaForm, setMateriaForm] = useState({
+    nombre: '',
+    descripcion: '',
+    icono: '',
+    color: '',
+  });
+  const [preguntaEditingId, setPreguntaEditingId] = useState<string | null>(null);
+  const [preguntaForm, setPreguntaForm] = useState({
+    enunciado: '',
+    subtema: '',
+    nivel: 'MEDIO' as Pregunta['nivel'],
+  });
+  const [preguntaOpciones, setPreguntaOpciones] = useState<OpcionAdmin[]>([
+    { id: 1, texto: '', correcta: true },
+    { id: 2, texto: '', correcta: false },
+    { id: 3, texto: '', correcta: false },
+    { id: 4, texto: '', correcta: false },
+  ]);
+  const [cuestionarioEditingId, setCuestionarioEditingId] = useState<string | null>(null);
+  const [cuestionarioForm, setCuestionarioForm] = useState({
+    materiaId: '',
+    nombre: '',
+    cantidadPreguntas: 20,
+    tiempoMinutos: 15,
+    fechaInicio: '',
+    fechaFin: '',
+  });
 
   const twoFaDigitsRef = useRef<Array<HTMLInputElement | null>>([]);
   const [twoFaDigits, setTwoFaDigits] = useState(Array.from({ length: 6 }, () => ''));
@@ -653,6 +727,285 @@ export default function App() {
   const loadCuestionarios = async (materiaId: string) => {
     const data = await api.listCuestionarios(materiaId);
     setCuestionarios(data.cuestionarios as Cuestionario[]);
+  };
+
+  const loadAdminMaterias = async () => {
+    const data = await api.listMaterias(true);
+    const materias = data.materias as MateriaApi[];
+    setAdminMaterias(materias);
+    if (!adminSelectedMateriaId && materias.length > 0) {
+      setAdminSelectedMateriaId(materias[0].id);
+      setCuestionarioForm((prev) => ({ ...prev, materiaId: materias[0].id }));
+    }
+  };
+
+  const loadAdminPreguntas = async (materiaId: string) => {
+    const data = await api.listPreguntas(materiaId, true);
+    const preguntas = (data.preguntas as Array<PreguntaAdmin & { opciones: unknown }>).map((row) => ({
+      ...row,
+      opciones: parseOpcionesAdmin(row.opciones),
+    }));
+    setAdminPreguntas(preguntas);
+  };
+
+  const loadAdminCuestionarios = async (materiaId: string) => {
+    const data = await api.listCuestionarios(materiaId, true);
+    setAdminCuestionarios(data.cuestionarios as CuestionarioAdmin[]);
+  };
+
+  const resetMateriaForm = () => {
+    setMateriaEditingId(null);
+    setMateriaForm({ nombre: '', descripcion: '', icono: '', color: '' });
+  };
+
+  const resetPreguntaForm = () => {
+    setPreguntaEditingId(null);
+    setPreguntaForm({ enunciado: '', subtema: '', nivel: 'MEDIO' });
+    setPreguntaOpciones([
+      { id: 1, texto: '', correcta: true },
+      { id: 2, texto: '', correcta: false },
+      { id: 3, texto: '', correcta: false },
+      { id: 4, texto: '', correcta: false },
+    ]);
+  };
+
+  const resetCuestionarioForm = (materiaId?: string) => {
+    const resolvedMateriaId = materiaId ?? adminSelectedMateriaId ?? '';
+    setCuestionarioEditingId(null);
+    setCuestionarioForm({
+      materiaId: resolvedMateriaId,
+      nombre: '',
+      cantidadPreguntas: 20,
+      tiempoMinutos: 15,
+      fechaInicio: '',
+      fechaFin: '',
+    });
+  };
+
+  const handleSaveMateria = async () => {
+    setAdminError(null);
+    try {
+      if (!materiaForm.nombre.trim()) {
+        setAdminError('El nombre de la materia es obligatorio.');
+        return;
+      }
+      if (materiaEditingId) {
+        await api.updateMateria(materiaEditingId, {
+          nombre: materiaForm.nombre.trim(),
+          descripcion: materiaForm.descripcion.trim() || undefined,
+          icono: materiaForm.icono.trim() || undefined,
+          color: materiaForm.color.trim() || undefined,
+        });
+      } else {
+        await api.createMateria({
+          nombre: materiaForm.nombre.trim(),
+          descripcion: materiaForm.descripcion.trim() || undefined,
+          icono: materiaForm.icono.trim() || undefined,
+          color: materiaForm.color.trim() || undefined,
+        });
+      }
+      await loadAdminMaterias();
+      resetMateriaForm();
+    } catch (error) {
+      setAdminError(error instanceof Error ? error.message : 'Error guardando la materia');
+    }
+  };
+
+  const handleEditMateria = (materia: MateriaApi) => {
+    setMateriaEditingId(materia.id);
+    setMateriaForm({
+      nombre: materia.nombre || '',
+      descripcion: materia.descripcion || '',
+      icono: materia.icono || '',
+      color: materia.color || '',
+    });
+  };
+
+  const handleToggleMateria = async (materia: MateriaApi & { activa?: boolean }) => {
+    setAdminError(null);
+    try {
+      await api.toggleMateria(materia.id, typeof materia.activa === 'boolean' ? !materia.activa : undefined);
+      await loadAdminMaterias();
+    } catch (error) {
+      setAdminError(error instanceof Error ? error.message : 'Error actualizando la materia');
+    }
+  };
+
+  const handleOptionTextChange = (id: number, value: string) => {
+    setPreguntaOpciones((prev) => prev.map((opt) => (opt.id === id ? { ...opt, texto: value } : opt)));
+  };
+
+  const handleOptionCorrect = (id: number) => {
+    setPreguntaOpciones((prev) => prev.map((opt) => ({ ...opt, correcta: opt.id === id })));
+  };
+
+  const handleAddOption = () => {
+    setPreguntaOpciones((prev) => {
+      if (prev.length >= 5) return prev;
+      const nextId = prev.length ? Math.max(...prev.map((opt) => opt.id)) + 1 : 1;
+      return [...prev, { id: nextId, texto: '', correcta: false }];
+    });
+  };
+
+  const handleRemoveOption = (id: number) => {
+    setPreguntaOpciones((prev) => {
+      if (prev.length <= 3) return prev;
+      const next = prev.filter((opt) => opt.id !== id);
+      if (!next.some((opt) => opt.correcta) && next.length > 0) {
+        next[0].correcta = true;
+      }
+      return next;
+    });
+  };
+
+  const handleSavePregunta = async () => {
+    setAdminError(null);
+    if (!adminSelectedMateriaId) {
+      setAdminError('Selecciona una materia.');
+      return;
+    }
+    if (!preguntaForm.enunciado.trim()) {
+      setAdminError('El enunciado es obligatorio.');
+      return;
+    }
+
+    const opcionesPayload = preguntaOpciones.map((opt, index) => ({
+      id: index + 1,
+      texto: opt.texto.trim(),
+      correcta: Boolean(opt.correcta),
+    }));
+
+    if (opcionesPayload.some((opt) => !opt.texto)) {
+      setAdminError('Todas las opciones deben tener texto.');
+      return;
+    }
+    if (opcionesPayload.filter((opt) => opt.correcta).length !== 1) {
+      setAdminError('Debe existir exactamente una opción correcta.');
+      return;
+    }
+
+    try {
+      if (preguntaEditingId) {
+        await api.updatePregunta(preguntaEditingId, {
+          nivel: preguntaForm.nivel,
+          enunciado: preguntaForm.enunciado.trim(),
+          subtema: preguntaForm.subtema.trim() || undefined,
+          opciones: opcionesPayload,
+        });
+      } else {
+        await api.createPregunta({
+          materiaId: adminSelectedMateriaId,
+          nivel: preguntaForm.nivel,
+          enunciado: preguntaForm.enunciado.trim(),
+          subtema: preguntaForm.subtema.trim() || undefined,
+          opciones: opcionesPayload,
+        });
+      }
+      await loadAdminPreguntas(adminSelectedMateriaId);
+      resetPreguntaForm();
+    } catch (error) {
+      setAdminError(error instanceof Error ? error.message : 'Error guardando la pregunta');
+    }
+  };
+
+  const handleEditPregunta = (pregunta: PreguntaAdmin) => {
+    setPreguntaEditingId(pregunta.id);
+    setPreguntaForm({
+      enunciado: pregunta.enunciado,
+      subtema: pregunta.subtema || '',
+      nivel: pregunta.nivel,
+    });
+    const opciones = pregunta.opciones.length ? pregunta.opciones : [];
+    if (opciones.length) {
+      setPreguntaOpciones(
+        opciones.map((opt, index) => ({
+          id: index + 1,
+          texto: opt.texto,
+          correcta: Boolean(opt.correcta),
+        }))
+      );
+    }
+  };
+
+  const handleTogglePregunta = async (pregunta: PreguntaAdmin) => {
+    setAdminError(null);
+    try {
+      await api.togglePregunta(pregunta.id, !pregunta.activa);
+      if (adminSelectedMateriaId) {
+        await loadAdminPreguntas(adminSelectedMateriaId);
+      }
+    } catch (error) {
+      setAdminError(error instanceof Error ? error.message : 'Error actualizando la pregunta');
+    }
+  };
+
+  const handleSaveCuestionario = async () => {
+    setAdminError(null);
+    if (!cuestionarioForm.materiaId) {
+      setAdminError('Selecciona una materia.');
+      return;
+    }
+    if (!cuestionarioForm.nombre.trim()) {
+      setAdminError('El nombre del cuestionario es obligatorio.');
+      return;
+    }
+    if (!cuestionarioForm.cantidadPreguntas || cuestionarioForm.cantidadPreguntas <= 0) {
+      setAdminError('La cantidad de preguntas debe ser mayor a 0.');
+      return;
+    }
+    if (!cuestionarioForm.tiempoMinutos || cuestionarioForm.tiempoMinutos <= 0) {
+      setAdminError('El tiempo debe ser mayor a 0.');
+      return;
+    }
+
+    const payload = {
+      materiaId: cuestionarioForm.materiaId,
+      nombre: cuestionarioForm.nombre.trim(),
+      cantidadPreguntas: Number(cuestionarioForm.cantidadPreguntas),
+      tiempoMinutos: Number(cuestionarioForm.tiempoMinutos),
+      fechaInicio: cuestionarioForm.fechaInicio ? new Date(cuestionarioForm.fechaInicio).toISOString() : null,
+      fechaFin: cuestionarioForm.fechaFin ? new Date(cuestionarioForm.fechaFin).toISOString() : null,
+    };
+
+    try {
+      if (cuestionarioEditingId) {
+        await api.updateCuestionario(cuestionarioEditingId, {
+          nombre: payload.nombre,
+          cantidadPreguntas: payload.cantidadPreguntas,
+          tiempoMinutos: payload.tiempoMinutos,
+          fechaInicio: payload.fechaInicio,
+          fechaFin: payload.fechaFin,
+        });
+      } else {
+        await api.createCuestionario(payload);
+      }
+      await loadAdminCuestionarios(cuestionarioForm.materiaId);
+      resetCuestionarioForm();
+    } catch (error) {
+      setAdminError(error instanceof Error ? error.message : 'Error guardando el cuestionario');
+    }
+  };
+
+  const handleEditCuestionario = (cuestionario: CuestionarioAdmin) => {
+    setCuestionarioEditingId(cuestionario.id);
+    setCuestionarioForm({
+      materiaId: cuestionario.materia_id,
+      nombre: cuestionario.nombre,
+      cantidadPreguntas: cuestionario.cantidad_preguntas,
+      tiempoMinutos: cuestionario.tiempo_minutos,
+      fechaInicio: cuestionario.fecha_inicio ? cuestionario.fecha_inicio.slice(0, 16) : '',
+      fechaFin: cuestionario.fecha_fin ? cuestionario.fecha_fin.slice(0, 16) : '',
+    });
+  };
+
+  const handleToggleCuestionario = async (cuestionario: CuestionarioAdmin) => {
+    setAdminError(null);
+    try {
+      await api.toggleCuestionario(cuestionario.id, !cuestionario.activo);
+      await loadAdminCuestionarios(cuestionario.materia_id);
+    } catch (error) {
+      setAdminError(error instanceof Error ? error.message : 'Error actualizando el cuestionario');
+    }
   };
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -825,6 +1178,21 @@ export default function App() {
   }, [isAuthenticated]);
 
   useEffect(() => {
+    if (activePage !== 'admin' || user?.role !== 'ADMIN') return;
+    loadAdminMaterias();
+  }, [activePage, user?.role]);
+
+  useEffect(() => {
+    if (!adminSelectedMateriaId || activePage !== 'admin') return;
+    if (adminTab === 'preguntas') {
+      loadAdminPreguntas(adminSelectedMateriaId);
+    }
+    if (adminTab === 'cuestionarios') {
+      loadAdminCuestionarios(adminSelectedMateriaId);
+    }
+  }, [adminSelectedMateriaId, adminTab, activePage]);
+
+  useEffect(() => {
     if (!selectedSubject) return;
     loadCuestionarios(selectedSubject.id);
   }, [selectedSubject]);
@@ -975,6 +1343,21 @@ export default function App() {
           >
             <LayoutDashboard size={20} /> Resumen General
           </button>
+          {user?.role === 'ADMIN' && (
+            <button
+              onClick={() => {
+                setActivePage('admin');
+                setSelectedSubject(null);
+              }}
+              className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-all ${
+                activePage === 'admin'
+                  ? 'bg-gray-900 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <BarChart3 size={20} /> Panel Admin
+            </button>
+          )}
           {subjects.map((subject) => (
             <button
               key={subject.id}
@@ -1057,6 +1440,438 @@ export default function App() {
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {activePage === 'admin' && user?.role === 'ADMIN' && (
+              <div className="space-y-8">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <h1 className="text-4xl font-bold text-gray-900 mb-2">Panel de administración</h1>
+                    <p className="text-gray-500">
+                      Crea módulos, preguntas con respuesta correcta y administra tiempos por cuestionario.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    { key: 'materias', label: 'Módulos/Materias' },
+                    { key: 'preguntas', label: 'Preguntas' },
+                    { key: 'cuestionarios', label: 'Cuestionarios' },
+                  ].map((item) => (
+                    <button
+                      key={item.key}
+                      onClick={() => setAdminTab(item.key as typeof adminTab)}
+                      className={`px-5 py-2 rounded-2xl font-semibold border transition-all ${
+                        adminTab === item.key
+                          ? 'bg-[#00A8E8] text-white border-[#00A8E8]'
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                {adminError && <div className="text-sm text-red-500">{adminError}</div>}
+
+                {adminTab === 'materias' && (
+                  <div className="grid lg:grid-cols-2 gap-8">
+                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                      <h3 className="text-xl font-bold mb-6">
+                        {materiaEditingId ? 'Editar materia' : 'Crear nueva materia'}
+                      </h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                          <input
+                            value={materiaForm.nombre}
+                            onChange={(event) => setMateriaForm((prev) => ({ ...prev, nombre: event.target.value }))}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                          <textarea
+                            value={materiaForm.descripcion}
+                            onChange={(event) =>
+                              setMateriaForm((prev) => ({ ...prev, descripcion: event.target.value }))
+                            }
+                            rows={3}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                          />
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Icono (slug)</label>
+                            <input
+                              value={materiaForm.icono}
+                              onChange={(event) => setMateriaForm((prev) => ({ ...prev, icono: event.target.value }))}
+                              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                              placeholder="math.svg"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
+                            <input
+                              value={materiaForm.color}
+                              onChange={(event) => setMateriaForm((prev) => ({ ...prev, color: event.target.value }))}
+                              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                              placeholder="#00A8E8"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <Button onClick={handleSaveMateria}>
+                            {materiaEditingId ? 'Guardar cambios' : 'Crear materia'}
+                          </Button>
+                          {materiaEditingId && (
+                            <Button variant="ghost" onClick={resetMateriaForm}>
+                              Cancelar
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                      <h3 className="text-xl font-bold mb-6">Materias registradas</h3>
+                      <div className="space-y-4">
+                        {adminMaterias.map((materia) => (
+                          <div
+                            key={materia.id}
+                            className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b pb-4"
+                          >
+                            <div>
+                              <p className="font-semibold text-gray-800">{materia.nombre}</p>
+                              <p className="text-sm text-gray-500">{materia.descripcion || 'Sin descripción'}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditMateria(materia)}
+                                className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => handleToggleMateria(materia as MateriaApi & { activa?: boolean })}
+                                className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+                              >
+                                Activar/Desactivar
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {!adminMaterias.length && (
+                          <p className="text-sm text-gray-400">Aún no hay materias creadas.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {adminTab === 'preguntas' && (
+                  <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Materia</label>
+                      <select
+                        value={adminSelectedMateriaId}
+                        onChange={(event) => {
+                          setAdminSelectedMateriaId(event.target.value);
+                          resetPreguntaForm();
+                        }}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                      >
+                        <option value="">Selecciona una materia</option>
+                        {adminMaterias.map((materia) => (
+                          <option key={materia.id} value={materia.id}>
+                            {materia.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid lg:grid-cols-2 gap-8">
+                      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                        <h3 className="text-xl font-bold mb-6">
+                          {preguntaEditingId ? 'Editar pregunta' : 'Crear nueva pregunta'}
+                        </h3>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Enunciado</label>
+                            <textarea
+                              value={preguntaForm.enunciado}
+                              onChange={(event) =>
+                                setPreguntaForm((prev) => ({ ...prev, enunciado: event.target.value }))
+                              }
+                              rows={3}
+                              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                            />
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Nivel</label>
+                              <select
+                                value={preguntaForm.nivel}
+                                onChange={(event) =>
+                                  setPreguntaForm((prev) => ({ ...prev, nivel: event.target.value as Pregunta['nivel'] }))
+                                }
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                              >
+                                <option value="FACIL">Fácil</option>
+                                <option value="MEDIO">Medio</option>
+                                <option value="ALTO">Alto</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Subtema</label>
+                              <input
+                                value={preguntaForm.subtema}
+                                onChange={(event) =>
+                                  setPreguntaForm((prev) => ({ ...prev, subtema: event.target.value }))
+                                }
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <p className="text-sm font-medium text-gray-700">Opciones (marca la correcta)</p>
+                            {preguntaOpciones.map((opcion, index) => (
+                              <div
+                                key={opcion.id}
+                                className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2"
+                              >
+                                <input
+                                  type="radio"
+                                  checked={opcion.correcta}
+                                  onChange={() => handleOptionCorrect(opcion.id)}
+                                />
+                                <input
+                                  value={opcion.texto}
+                                  onChange={(event) => handleOptionTextChange(opcion.id, event.target.value)}
+                                  placeholder={`Opción ${index + 1}`}
+                                  className="flex-1 bg-transparent outline-none"
+                                />
+                                <button
+                                  onClick={() => handleRemoveOption(opcion.id)}
+                                  className="text-xs text-gray-400 hover:text-red-500"
+                                  type="button"
+                                >
+                                  Quitar
+                                </button>
+                              </div>
+                            ))}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleAddOption}
+                                className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+                                type="button"
+                              >
+                                Añadir opción
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-3">
+                            <Button onClick={handleSavePregunta}>
+                              {preguntaEditingId ? 'Guardar cambios' : 'Crear pregunta'}
+                            </Button>
+                            {preguntaEditingId && (
+                              <Button variant="ghost" onClick={resetPreguntaForm}>
+                                Cancelar
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                        <h3 className="text-xl font-bold mb-6">Preguntas registradas</h3>
+                        <div className="space-y-4">
+                          {adminPreguntas.map((pregunta) => (
+                            <div key={pregunta.id} className="border-b pb-4">
+                              <p className="font-semibold text-gray-800">{pregunta.enunciado}</p>
+                              <p className="text-xs text-gray-400 mb-2">
+                                Nivel {pregunta.nivel} • {pregunta.subtema || 'Sin subtema'}
+                              </p>
+                              <div className="flex flex-wrap gap-2 text-xs text-gray-500 mb-3">
+                                {pregunta.opciones.map((opt) => (
+                                  <span
+                                    key={opt.id}
+                                    className={`px-2 py-1 rounded-full border ${
+                                      opt.correcta ? 'border-green-300 text-green-600' : 'border-gray-200'
+                                    }`}
+                                  >
+                                    {opt.texto}
+                                  </span>
+                                ))}
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEditPregunta(pregunta)}
+                                  className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => handleTogglePregunta(pregunta)}
+                                  className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+                                >
+                                  Activar/Desactivar
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          {!adminPreguntas.length && (
+                            <p className="text-sm text-gray-400">No hay preguntas para esta materia.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {adminTab === 'cuestionarios' && (
+                  <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Materia</label>
+                      <select
+                        value={adminSelectedMateriaId}
+                        onChange={(event) => {
+                          setAdminSelectedMateriaId(event.target.value);
+                          resetCuestionarioForm(event.target.value);
+                        }}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                      >
+                        <option value="">Selecciona una materia</option>
+                        {adminMaterias.map((materia) => (
+                          <option key={materia.id} value={materia.id}>
+                            {materia.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid lg:grid-cols-2 gap-8">
+                      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                        <h3 className="text-xl font-bold mb-6">
+                          {cuestionarioEditingId ? 'Editar cuestionario' : 'Crear cuestionario'}
+                        </h3>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                            <input
+                              value={cuestionarioForm.nombre}
+                              onChange={(event) =>
+                                setCuestionarioForm((prev) => ({ ...prev, nombre: event.target.value }))
+                              }
+                              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                            />
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad preguntas</label>
+                              <input
+                                type="number"
+                                min={1}
+                                value={cuestionarioForm.cantidadPreguntas}
+                                onChange={(event) =>
+                                  setCuestionarioForm((prev) => ({
+                                    ...prev,
+                                    cantidadPreguntas: Number(event.target.value),
+                                  }))
+                                }
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Tiempo (min)</label>
+                              <input
+                                type="number"
+                                min={1}
+                                value={cuestionarioForm.tiempoMinutos}
+                                onChange={(event) =>
+                                  setCuestionarioForm((prev) => ({
+                                    ...prev,
+                                    tiempoMinutos: Number(event.target.value),
+                                  }))
+                                }
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha inicio</label>
+                              <input
+                                type="datetime-local"
+                                value={cuestionarioForm.fechaInicio}
+                                onChange={(event) =>
+                                  setCuestionarioForm((prev) => ({ ...prev, fechaInicio: event.target.value }))
+                                }
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha fin</label>
+                              <input
+                                type="datetime-local"
+                                value={cuestionarioForm.fechaFin}
+                                onChange={(event) =>
+                                  setCuestionarioForm((prev) => ({ ...prev, fechaFin: event.target.value }))
+                                }
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-3">
+                            <Button onClick={handleSaveCuestionario}>
+                              {cuestionarioEditingId ? 'Guardar cambios' : 'Crear cuestionario'}
+                            </Button>
+                            {cuestionarioEditingId && (
+                              <Button variant="ghost" onClick={resetCuestionarioForm}>
+                                Cancelar
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                        <h3 className="text-xl font-bold mb-6">Cuestionarios registrados</h3>
+                        <div className="space-y-4">
+                          {adminCuestionarios.map((cuestionario) => (
+                            <div key={cuestionario.id} className="border-b pb-4">
+                              <p className="font-semibold text-gray-800">{cuestionario.nombre}</p>
+                              <p className="text-xs text-gray-400 mb-2">
+                                {cuestionario.cantidad_preguntas} preguntas • {cuestionario.tiempo_minutos} min
+                              </p>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEditCuestionario(cuestionario)}
+                                  className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => handleToggleCuestionario(cuestionario)}
+                                  className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+                                >
+                                  Activar/Desactivar
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          {!adminCuestionarios.length && (
+                            <p className="text-sm text-gray-400">No hay cuestionarios para esta materia.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

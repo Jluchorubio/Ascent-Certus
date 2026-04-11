@@ -1,4 +1,4 @@
-﻿export type ActivePage = 'landing' | 'login' | 'dashboard' | 'subject' | 'test' | 'result';
+﻿export type ActivePage = 'landing' | 'login' | 'dashboard' | 'subject' | 'test' | 'result' | 'admin';
 
 export type UserInfo = {
   id: string;

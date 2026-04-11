@@ -49,9 +49,78 @@ export const api = {
     }),
   logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
   me: () => request<{ user: unknown }>('/auth/me'),
-  listMaterias: () => request<{ materias: unknown[] }>('/materias'),
-  listCuestionarios: (materiaId: string) =>
-    request<{ cuestionarios: unknown[] }>(`/cuestionarios?materiaId=${encodeURIComponent(materiaId)}`),
+  listMaterias: (all?: boolean) => {
+    const param = all ? '?all=true' : '';
+    return request<{ materias: unknown[] }>(`/materias${param}`);
+  },
+  createMateria: (payload: { nombre: string; descripcion?: string; icono?: string; color?: string }) =>
+    request<{ materia: unknown }>('/materias', { method: 'POST', body: payload }),
+  updateMateria: (
+    id: string,
+    payload: { nombre?: string; descripcion?: string; icono?: string; color?: string }
+  ) => request<{ materia: unknown }>(`/materias/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }),
+  toggleMateria: (id: string, activa?: boolean) =>
+    request<{ materia: unknown }>(`/materias/${encodeURIComponent(id)}/toggle`, {
+      method: 'PATCH',
+      body: typeof activa === 'boolean' ? { activa } : undefined,
+    }),
+  listCuestionarios: (materiaId: string, all?: boolean) => {
+    const params = new URLSearchParams();
+    params.set('materiaId', materiaId);
+    if (all) params.set('all', 'true');
+    return request<{ cuestionarios: unknown[] }>(`/cuestionarios?${params.toString()}`);
+  },
+  createCuestionario: (payload: {
+    materiaId: string;
+    nombre: string;
+    cantidadPreguntas: number;
+    tiempoMinutos?: number;
+    fechaInicio?: string | null;
+    fechaFin?: string | null;
+  }) => request<{ cuestionario: unknown }>('/cuestionarios', { method: 'POST', body: payload }),
+  updateCuestionario: (
+    id: string,
+    payload: {
+      nombre?: string;
+      cantidadPreguntas?: number;
+      tiempoMinutos?: number;
+      fechaInicio?: string | null;
+      fechaFin?: string | null;
+    }
+  ) => request<{ cuestionario: unknown }>(`/cuestionarios/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }),
+  toggleCuestionario: (id: string, activo?: boolean) =>
+    request<{ cuestionario: unknown }>(`/cuestionarios/${encodeURIComponent(id)}/toggle`, {
+      method: 'PATCH',
+      body: typeof activo === 'boolean' ? { activo } : undefined,
+    }),
+  listPreguntas: (materiaId: string, all?: boolean) => {
+    const params = new URLSearchParams();
+    if (all) params.set('all', 'true');
+    const qs = params.toString();
+    const suffix = qs ? `?${qs}` : '';
+    return request<{ preguntas: unknown[] }>(`/preguntas/materia/${encodeURIComponent(materiaId)}${suffix}`);
+  },
+  createPregunta: (payload: {
+    materiaId: string;
+    nivel: 'FACIL' | 'MEDIO' | 'ALTO';
+    enunciado: string;
+    subtema?: string;
+    opciones: { id: number; texto: string; correcta: boolean }[];
+  }) => request<{ pregunta: unknown }>('/preguntas', { method: 'POST', body: payload }),
+  updatePregunta: (
+    id: string,
+    payload: {
+      nivel?: 'FACIL' | 'MEDIO' | 'ALTO';
+      enunciado?: string;
+      subtema?: string;
+      opciones?: { id: number; texto: string; correcta: boolean }[];
+    }
+  ) => request<{ pregunta: unknown }>(`/preguntas/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }),
+  togglePregunta: (id: string, activa?: boolean) =>
+    request<{ pregunta: unknown }>(`/preguntas/${encodeURIComponent(id)}/toggle`, {
+      method: 'PATCH',
+      body: typeof activa === 'boolean' ? { activa } : undefined,
+    }),
   startSesion: (cuestionarioId: string) =>
     request<{
       sesion: unknown;
