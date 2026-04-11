@@ -1,96 +1,96 @@
-# Ascent Certus - Adaptive Evaluation Platform
+# Ascent Certus - Plataforma de Evaluación Adaptativa
 
-Fullstack platform for adaptive student evaluations with a real-time progress dashboard and an admin panel to manage modules, questions, and quiz configuration.
+Plataforma fullstack para evaluaciones adaptativas con dashboard en tiempo real y panel de administración para gestionar módulos, preguntas y configuración de cuestionarios.
 
-## What Was Implemented
-1. Connected the frontend to the backend API and Supabase data.
-2. Enforced timed quizzes with a visible countdown and automatic finish on timeout.
-3. Adaptive question engine and scoring flow with final results view.
-4. Historical progress chart with per-subject filtering and periodic refresh.
-5. Admin visual panel for CRUD of:
-   - Materias (modules)
-   - Preguntas with options and correct answer
-   - Cuestionarios with configurable time and question count
-6. Landing page improvements (extra content + infinite certifications carousel).
-7. Removed "Prueba demo" and removed the "Crear cuenta" button (no public registration).
-8. Redesigned footer while preserving the existing visual identity.
+## Qué se implementó
+1. Conexión del frontend con la API y Supabase.
+2. Cuestionarios con tiempo máximo, contador visible y cierre automático al expirar.
+3. Motor adaptativo con flujo de puntuación y vista de resultados.
+4. Gráfico histórico con filtro por materia y refresco periódico.
+5. Panel de administración (UI) con CRUD de:
+   - Materias (módulos)
+   - Preguntas con opciones y respuesta correcta
+   - Cuestionarios con tiempo y cantidad configurables
+6. Mejoras en la landing (contenido adicional + carrusel infinito de certificaciones).
+7. Eliminación de “Prueba demo” y del botón “Crear cuenta” (no hay registro público).
+8. Footer renovado manteniendo la identidad visual.
 
-## Core Features
-1. Auth with JWT (2FA optional; can be disabled for dev).
-2. Landing page + login + dashboard + module view + quiz flow + results.
-3. Adaptive engine:
-   - Starts at MEDIO.
-   - Correct answer increases level (max ALTO).
-   - Two incorrect in a row decreases level (min FACIL).
-4. Timed quizzes with progress indicator ("Pregunta N de M").
-5. Results summary without exposing correct/incorrect per question.
-6. Historical chart (Recharts) with filter by subject.
+## Funcionalidades principales
+1. Autenticación con JWT (2FA opcional; puede desactivarse en dev).
+2. Landing + login + dashboard + módulos + cuestionario + resultados.
+3. Motor adaptativo:
+   - Inicia en MEDIO.
+   - Respuesta correcta sube nivel (máx ALTO).
+   - Dos incorrectas seguidas bajan nivel (mín FACIL).
+4. Cuestionarios con indicador de progreso (“Pregunta N de M”).
+5. Resumen final sin mostrar aciertos/errores por pregunta.
+6. Gráfico histórico (Recharts) con filtro por materia.
 
-## Admin Panel (UI)
-Available only for users with role `ADMIN`.
+## Panel de administración (UI)
+Disponible solo para usuarios con rol `ADMIN`.
 
 1. Materias:
-   - Create, edit, activate/deactivate.
-   - Fields: name, description, icon, color.
+   - Crear, editar, activar/desactivar.
+   - Campos: nombre, descripción, ícono, color.
 2. Preguntas:
-   - Create, edit, activate/deactivate.
-   - Set level, subtema, options (3-5), and exactly one correct.
+   - Crear, editar, activar/desactivar.
+   - Definir nivel, subtema, opciones (3-5) y una sola correcta.
 3. Cuestionarios:
-   - Create, edit, activate/deactivate.
-   - Configure number of questions and time (minutes).
-   - Optional date window.
+   - Crear, editar, activar/desactivar.
+   - Configurar cantidad de preguntas y tiempo (minutos).
+   - Ventana de fechas opcional.
 
-## Tech Stack
+## Stack tecnológico
 1. Frontend: React + Tailwind + Recharts
 2. Backend: Node.js + Express + TypeScript
-3. DB: PostgreSQL (Supabase) with `pg` driver (no ORM)
-4. Auth: JWT in httpOnly cookie
+3. Base de datos: PostgreSQL (Supabase) con `pg` (sin ORM)
+4. Auth: JWT en cookie httpOnly
 
-## Project Structure
-1. `backend/` API and DB access
-2. `frontend/` React app
-3. `db.psql` DB schema + seed data
+## Estructura del proyecto
+1. `backend/` API y acceso a BD
+2. `frontend/` App React
+3. `db.psql` Esquema y datos seed
 
-## Setup
-### 1) Database
-Run `db.psql` inside Supabase SQL Editor to create schema and seed data.
+## Instalación
+### 1) Base de datos
+Ejecutar `db.psql` en el SQL Editor de Supabase.
 
 ### 2) Backend
-Create `backend/.env` (example: `backend/.env.example`).
+Crear `backend/.env` (ver ejemplo en `backend/.env.example`).
 
-Required keys:
-1. `DATABASE_URL` Supabase connection string
-2. `PG_SSL=true` for Supabase
-3. `JWT_SECRET` any strong secret
-4. `CORS_ORIGIN` frontend URL
-5. `DISABLE_2FA=true` for dev (set to false to enable)
-6. `MAIL_USER` and `MAIL_PASS` only if 2FA is enabled
+Variables requeridas:
+1. `DATABASE_URL` conexión a Supabase
+2. `PG_SSL=true` para Supabase
+3. `JWT_SECRET` secreto fuerte
+4. `CORS_ORIGIN` URL del frontend
+5. `DISABLE_2FA=true` en dev (poner en false para activar 2FA)
+6. `MAIL_USER` y `MAIL_PASS` solo si 2FA está activo
 
-Run:
+Comandos:
 1. `cd backend`
 2. `npm install`
 3. `npm run dev`
 
 ### 3) Frontend
-Create `frontend/.env` (example: `frontend/.env.example`).
+Crear `frontend/.env` (ver ejemplo en `frontend/.env.example`).
 
-Required keys:
+Variables requeridas:
 1. `VITE_API_URL=http://localhost:3000/api/v1`
 
-Run:
+Comandos:
 1. `cd frontend`
 2. `npm install`
 3. `npm run dev`
 
-## Test Accounts (Dev)
+## Cuentas de prueba (Dev)
 1. Admin: `admin@test.com` / `123456`
-2. Student: `estudiante@test.com` / `123456`
+2. Estudiante: `estudiante@test.com` / `123456`
 
-The passwords are stored hashed in the database. These are for local/dev only.
+Las contraseñas están almacenadas hasheadas en la base de datos. Uso solo para pruebas locales/dev.
 
-## Notes
-1. The chart refreshes every 15 seconds. Adjust in `frontend/src/App.tsx` if you need a different interval.
-2. For multiple cuestionarios per materia, the student flow currently uses the first returned. Add a selector if needed.
+## Notas
+1. El gráfico refresca cada 15 segundos. Puedes ajustar el intervalo en `frontend/src/App.tsx`.
+2. Si hay múltiples cuestionarios por materia, el flujo del estudiante usa el primero retornado. Se puede agregar selector si se requiere.
 
 ## Scripts
 ### Backend
