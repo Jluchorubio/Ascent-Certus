@@ -126,7 +126,6 @@ type LandingPageProps = {
 type SubjectDashboardProps = {
   subject: Subject;
   principal?: Cuestionario;
-  demo?: Cuestionario | null;
   stats: {
     bestScore: number;
     averageScore: number;
@@ -142,6 +141,17 @@ type AnalyticsViewProps = {
   activeFilterId: string | null;
   onFilterChange: (id: string | null) => void;
 };
+
+const CERTIFICATIONS = [
+  'ISO 21001',
+  'ISO 9001',
+  'Saber 11°',
+  'Saber Pro',
+  'EF SET',
+  'Cambridge',
+  'STEM Ready',
+  'Quality Learning',
+];
 
 const Button = ({
   children,
@@ -183,7 +193,6 @@ const LandingPage = ({ onLoginClick }: LandingPageProps) => (
           de manera completamente gratuita. ¡Mejora tu futuro hoy!
         </p>
         <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-          <Button onClick={onLoginClick}>Crear Cuenta</Button>
           <Button variant="secondary" onClick={onLoginClick}>
             Iniciar Sesión
           </Button>
@@ -198,6 +207,46 @@ const LandingPage = ({ onLoginClick }: LandingPageProps) => (
           />
         </div>
         <div className="absolute -bottom-10 -right-10 w-64 h-64 bg-blue-100 rounded-full blur-3xl -z-10"></div>
+      </div>
+    </section>
+
+    <section className="py-16">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-10 mb-10">
+          <div>
+            <p className="text-sm uppercase tracking-[0.2em] text-gray-400 font-semibold mb-2">
+              Confianza institucional
+            </p>
+            <h2 className="text-3xl font-bold text-gray-900">
+              Certificaciones y estándares que respaldan nuestra metodología
+            </h2>
+          </div>
+          <div className="flex gap-6">
+            {[
+              { label: 'Escuelas aliadas', value: '120+' },
+              { label: 'Preguntas validadas', value: '5.000+' },
+              { label: 'Sesiones adaptativas', value: '18k' },
+            ].map((item) => (
+              <div key={item.label} className="bg-white border border-gray-100 rounded-2xl px-6 py-4 shadow-sm">
+                <p className="text-2xl font-bold text-gray-900">{item.value}</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">{item.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="marquee rounded-3xl border border-gray-100 bg-white/70 py-6">
+          <div className="marquee__track">
+            {[...CERTIFICATIONS, ...CERTIFICATIONS].map((name, index) => (
+              <div
+                key={`${name}-${index}`}
+                className="mx-4 px-6 py-3 rounded-full border border-gray-200 text-sm font-semibold text-gray-600 bg-white shadow-sm"
+              >
+                {name}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
 
@@ -268,7 +317,7 @@ const LandingPage = ({ onLoginClick }: LandingPageProps) => (
   </div>
 );
 
-const SubjectDashboard = ({ subject, principal, demo, stats, onStartTest }: SubjectDashboardProps) => (
+const SubjectDashboard = ({ subject, principal, stats, onStartTest }: SubjectDashboardProps) => (
   <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
     <div className="flex items-center gap-3 mb-8">
       <div className="p-2 rounded-lg bg-gray-100 text-[#00A8E8]">{subject.icon}</div>
@@ -334,30 +383,7 @@ const SubjectDashboard = ({ subject, principal, demo, stats, onStartTest }: Subj
       </p>
     </div>
 
-    <div className="grid md:grid-cols-2 gap-8">
-      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-lg transition-shadow">
-        <div className="text-center mb-6">
-          <h4 className="text-2xl font-bold mb-2">Prueba demo</h4>
-          <p className="text-gray-500 italic">Demostración del examen</p>
-        </div>
-        <div className="bg-gray-50 p-6 rounded-2xl text-sm text-gray-600 mb-6 text-center">
-          Es una prueba corta, te brinda la posibilidad de hacerte una idea del examen.
-        </div>
-        <div className="space-y-3 mb-8">
-          <div className="flex justify-between text-sm py-2 border-b">
-            <span>Cantidad de preguntas:</span>
-            <span className="font-bold">{demo ? demo.cantidad_preguntas : '---'}</span>
-          </div>
-          <div className="flex justify-between text-sm py-2 border-b">
-            <span>Tiempo para la prueba:</span>
-            <span className="font-bold">{demo ? `${demo.tiempo_minutos} min` : 'Sin límite'}</span>
-          </div>
-        </div>
-        <Button className="w-full" variant="secondary" disabled={!demo} onClick={() => demo && onStartTest(demo)}>
-          Iniciar Demo
-        </Button>
-      </div>
-
+    <div className="max-w-2xl mx-auto">
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-lg transition-shadow ring-2 ring-blue-100">
         <div className="text-center mb-6">
           <h4 className="text-2xl font-bold mb-2">Prueba principal</h4>
@@ -832,13 +858,7 @@ export default function App() {
     timeRemaining <= 180 ? 'text-yellow-500 bg-yellow-500/20 border-yellow-500/30' :
       'text-green-500 bg-green-500/20 border-green-500/30';
 
-  const sortedCuestionarios = [...cuestionarios].sort(
-    (a, b) => a.cantidad_preguntas - b.cantidad_preguntas
-  );
-  const demoCuestionario = sortedCuestionarios.length > 1 ? sortedCuestionarios[0] : null;
-  const principalCuestionario = sortedCuestionarios.length > 0
-    ? sortedCuestionarios[sortedCuestionarios.length - 1]
-    : undefined;
+  const principalCuestionario = cuestionarios.length > 0 ? cuestionarios[0] : undefined;
 
   if (!isAuthenticated) {
     if (is2FAPending) {
@@ -1044,7 +1064,6 @@ export default function App() {
               <SubjectDashboard
                 subject={selectedSubject}
                 principal={principalCuestionario}
-                demo={demoCuestionario}
                 stats={computeStats(selectedSubject.id)}
                 onStartTest={(cuestionario) => {
                   setSelectedSubject(selectedSubject);
