@@ -1,0 +1,1 @@
+﻿-- Consultas de codigos 2FA
