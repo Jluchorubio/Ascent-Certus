@@ -31,7 +31,7 @@ type Subject = {
   id: string;
   name: string;
   color: string;
-  icon: JSX.Element;
+  icon: ReactNode;
   descripcion?: string | null;
   icono?: string | null;
 };
