@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS preguntas (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     materia_id UUID NOT NULL REFERENCES materias(id) ON DELETE CASCADE,
     nivel nivel_pregunta NOT NULL,
+    peso INTEGER NOT NULL DEFAULT 1,
     enunciado TEXT NOT NULL,
     subtema VARCHAR(120),
     opciones JSONB NOT NULL,
@@ -87,7 +88,8 @@ CREATE TABLE IF NOT EXISTS preguntas (
     CHECK (
       jsonb_typeof(opciones) = 'array'
       AND jsonb_array_length(opciones) BETWEEN 3 AND 5
-    )
+    ),
+    CHECK (peso BETWEEN 1 AND 5)
 );
 
 -- ============================================

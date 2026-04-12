@@ -105,6 +105,7 @@ export const api = {
     nivel: 'FACIL' | 'MEDIO' | 'ALTO';
     enunciado: string;
     subtema?: string;
+    peso?: number;
     opciones: { id: number; texto: string; correcta: boolean }[];
   }) => request<{ pregunta: unknown }>('/preguntas', { method: 'POST', body: payload }),
   updatePregunta: (
@@ -113,6 +114,7 @@ export const api = {
       nivel?: 'FACIL' | 'MEDIO' | 'ALTO';
       enunciado?: string;
       subtema?: string;
+      peso?: number;
       opciones?: { id: number; texto: string; correcta: boolean }[];
     }
   ) => request<{ pregunta: unknown }>(`/preguntas/${encodeURIComponent(id)}`, { method: 'PATCH', body: payload }),

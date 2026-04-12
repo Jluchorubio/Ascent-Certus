@@ -4,6 +4,23 @@ import { AuthRequest } from "../middleware/authMiddleware";
 import { query } from "../db/pool";
 import { isNivel, validateOpciones } from "../utils/validators";
 
+const defaultPeso = (nivel: string) => {
+  if (nivel === "FACIL") return 1;
+  if (nivel === "MEDIO") return 2;
+  return 3;
+};
+
+const parsePeso = (peso: unknown): number | null | undefined => {
+  if (peso === undefined || peso === null || peso === "") {
+    return undefined;
+  }
+  const parsed = typeof peso === "number" ? peso : Number(peso);
+  if (!Number.isFinite(parsed)) return null;
+  const rounded = Math.round(parsed);
+  if (rounded < 1 || rounded > 5) return null;
+  return rounded;
+};
+
 const sanitizeOpciones = (opciones: unknown) => {
   if (typeof opciones === "string") {
     try {
@@ -62,12 +79,13 @@ export const listPreguntas = async (req: AuthRequest, res: Response) => {
 
 export const createPregunta = async (req: AuthRequest, res: Response) => {
   try {
-    const { materiaId, nivel, enunciado, opciones, subtema } = req.body as {
+    const { materiaId, nivel, enunciado, opciones, subtema, peso } = req.body as {
       materiaId?: string;
       nivel?: string;
       enunciado?: string;
       opciones?: unknown;
       subtema?: string;
+      peso?: number;
     };
 
     if (!materiaId || !nivel || !enunciado) {
@@ -78,19 +96,32 @@ export const createPregunta = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: "Nivel inválido" });
     }
 
+    const parsedPeso = parsePeso(peso);
+    if (parsedPeso === null) {
+      return res.status(400).json({ message: "Peso inválido (1 a 5)" });
+    }
+    const resolvedPeso = parsedPeso ?? defaultPeso(nivel);
+
     const validation = validateOpciones(opciones);
     if (!validation.valid) {
       return res.status(400).json({ message: validation.message });
     }
 
     const result = await query(
-      "INSERT INTO preguntas (materia_id, nivel, enunciado, subtema, opciones) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [materiaId, nivel, enunciado, subtema || null, JSON.stringify(opciones)]
+      "INSERT INTO preguntas (materia_id, nivel, enunciado, subtema, opciones, peso) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+      [materiaId, nivel, enunciado, subtema || null, JSON.stringify(opciones), resolvedPeso]
     );
 
     return res.status(201).json({ pregunta: result.rows[0] });
   } catch (error) {
     console.error(error);
+    const code = (error as { code?: string }).code;
+    if (code === "42703") {
+      return res.status(500).json({
+        message:
+          "Falta la columna peso en la tabla preguntas. Ejecuta la migración en Supabase.",
+      });
+    }
     return res.status(500).json({ message: "Error creando pregunta" });
   }
 };
@@ -98,11 +129,12 @@ export const createPregunta = async (req: AuthRequest, res: Response) => {
 export const updatePregunta = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { nivel, enunciado, opciones, subtema } = req.body as {
+    const { nivel, enunciado, opciones, subtema, peso } = req.body as {
       nivel?: string;
       enunciado?: string;
       opciones?: unknown;
       subtema?: string;
+      peso?: number;
     };
 
     const fields: string[] = [];
@@ -135,6 +167,15 @@ export const updatePregunta = async (req: AuthRequest, res: Response) => {
       values.push(JSON.stringify(opciones));
     }
 
+    if (peso !== undefined) {
+      const parsedPeso = parsePeso(peso);
+      if (parsedPeso === null) {
+        return res.status(400).json({ message: "Peso inválido (1 a 5)" });
+      }
+      fields.push(`peso = $${values.length + 1}`);
+      values.push(parsedPeso);
+    }
+
     if (fields.length === 0) {
       return res.status(400).json({ message: "No hay campos para actualizar" });
     }
@@ -150,6 +191,13 @@ export const updatePregunta = async (req: AuthRequest, res: Response) => {
     return res.json({ pregunta: result.rows[0] });
   } catch (error) {
     console.error(error);
+    const code = (error as { code?: string }).code;
+    if (code === "42703") {
+      return res.status(500).json({
+        message:
+          "Falta la columna peso en la tabla preguntas. Ejecuta la migración en Supabase.",
+      });
+    }
     return res.status(500).json({ message: "Error actualizando pregunta" });
   }
 };

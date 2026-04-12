@@ -78,6 +78,7 @@ type PreguntaAdmin = {
   nivel: 'FACIL' | 'MEDIO' | 'ALTO';
   subtema?: string | null;
   opciones: OpcionAdmin[];
+  peso?: number;
   activa: boolean;
 };
 
@@ -114,7 +115,8 @@ type FinishPayload = {
   completed: true;
   resultado: ResultadoSesion;
   tiempoEmpleadoSegundos: number;
-  desgloseSubtemas?: { subtema: string; total: number; correctas: number }[];
+  desgloseSubtemas?: { subtema: string; total: number; correctas: number; porcentaje: number }[];
+  desglosePorNivel?: { nivel: 'FACIL' | 'MEDIO' | 'ALTO'; total: number; correctas: number; porcentaje: number }[];
   timeout?: boolean;
 };
 
@@ -567,6 +569,12 @@ const scoreToPercent = (avg: number) => {
   return Math.max(0, Math.min(100, Math.round(((avg - 1) / 2) * 100)));
 };
 
+const defaultPesoForNivel = (nivel: Pregunta['nivel']) => {
+  if (nivel === 'FACIL') return 1;
+  if (nivel === 'MEDIO') return 2;
+  return 3;
+};
+
 const iconForMateria = (materia: MateriaApi) => {
   const name = `${materia.icono || ''} ${materia.nombre}`.toLowerCase();
   if (name.includes('mat')) return <Target className="w-5 h-5" />;
@@ -656,7 +664,9 @@ export default function App() {
     enunciado: '',
     subtema: '',
     nivel: 'MEDIO' as Pregunta['nivel'],
+    peso: 2,
   });
+  const [preguntaPesoManual, setPreguntaPesoManual] = useState(false);
   const [preguntaOpciones, setPreguntaOpciones] = useState<OpcionAdmin[]>([
     { id: 1, texto: '', correcta: true },
     { id: 2, texto: '', correcta: false },
@@ -760,7 +770,8 @@ export default function App() {
 
   const resetPreguntaForm = () => {
     setPreguntaEditingId(null);
-    setPreguntaForm({ enunciado: '', subtema: '', nivel: 'MEDIO' });
+    setPreguntaForm({ enunciado: '', subtema: '', nivel: 'MEDIO', peso: 2 });
+    setPreguntaPesoManual(false);
     setPreguntaOpciones([
       { id: 1, texto: '', correcta: true },
       { id: 2, texto: '', correcta: false },
@@ -797,14 +808,19 @@ export default function App() {
           color: materiaForm.color.trim() || undefined,
         });
       } else {
-        await api.createMateria({
+        const created = await api.createMateria({
           nombre: materiaForm.nombre.trim(),
           descripcion: materiaForm.descripcion.trim() || undefined,
           icono: materiaForm.icono.trim() || undefined,
           color: materiaForm.color.trim() || undefined,
         });
+        const createdMateria = created.materia as MateriaApi;
+        if (createdMateria?.id) {
+          setAdminSelectedMateriaId(createdMateria.id);
+          setCuestionarioForm((prev) => ({ ...prev, materiaId: createdMateria.id }));
+        }
       }
-      await loadAdminMaterias();
+      await Promise.all([loadAdminMaterias(), loadMaterias()]);
       resetMateriaForm();
     } catch (error) {
       setAdminError(error instanceof Error ? error.message : 'Error guardando la materia');
@@ -884,12 +900,19 @@ export default function App() {
       return;
     }
 
+    const peso = Number(preguntaForm.peso);
+    if (!Number.isFinite(peso) || peso < 1 || peso > 5) {
+      setAdminError('El peso debe estar entre 1 y 5.');
+      return;
+    }
+
     try {
       if (preguntaEditingId) {
         await api.updatePregunta(preguntaEditingId, {
           nivel: preguntaForm.nivel,
           enunciado: preguntaForm.enunciado.trim(),
           subtema: preguntaForm.subtema.trim() || undefined,
+          peso,
           opciones: opcionesPayload,
         });
       } else {
@@ -898,6 +921,7 @@ export default function App() {
           nivel: preguntaForm.nivel,
           enunciado: preguntaForm.enunciado.trim(),
           subtema: preguntaForm.subtema.trim() || undefined,
+          peso,
           opciones: opcionesPayload,
         });
       }
@@ -914,7 +938,9 @@ export default function App() {
       enunciado: pregunta.enunciado,
       subtema: pregunta.subtema || '',
       nivel: pregunta.nivel,
+      peso: pregunta.peso ?? defaultPesoForNivel(pregunta.nivel),
     });
+    setPreguntaPesoManual(true);
     const opciones = pregunta.opciones.length ? pregunta.opciones : [];
     if (opciones.length) {
       setPreguntaOpciones(
@@ -1609,20 +1635,58 @@ export default function App() {
                               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
                             />
                           </div>
-                          <div className="grid md:grid-cols-2 gap-4">
+                          <div className="grid md:grid-cols-3 gap-4">
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Nivel</label>
                               <select
                                 value={preguntaForm.nivel}
-                                onChange={(event) =>
-                                  setPreguntaForm((prev) => ({ ...prev, nivel: event.target.value as Pregunta['nivel'] }))
-                                }
+                                onChange={(event) => {
+                                  const nextNivel = event.target.value as Pregunta['nivel'];
+                                  setPreguntaForm((prev) => ({
+                                    ...prev,
+                                    nivel: nextNivel,
+                                    peso: preguntaPesoManual ? prev.peso : defaultPesoForNivel(nextNivel),
+                                  }));
+                                }}
                                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
                               >
                                 <option value="FACIL">Fácil</option>
                                 <option value="MEDIO">Medio</option>
                                 <option value="ALTO">Alto</option>
                               </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Peso</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={5}
+                                value={preguntaForm.peso}
+                                onChange={(event) => {
+                                  setPreguntaPesoManual(true);
+                                  setPreguntaForm((prev) => ({
+                                    ...prev,
+                                    peso: Number(event.target.value),
+                                  }));
+                                }}
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                              />
+                              <div className="flex items-center justify-between mt-2">
+                                <span className="text-xs text-gray-400">Default: Fácil 1 · Medio 2 · Alto 3</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPreguntaPesoManual(false);
+                                    setPreguntaForm((prev) => ({
+                                      ...prev,
+                                      peso: defaultPesoForNivel(prev.nivel),
+                                    }));
+                                  }}
+                                  className="text-xs text-[#00A8E8] hover:text-[#007bb0] font-semibold"
+                                >
+                                  Usar default
+                                </button>
+                              </div>
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Subtema</label>
@@ -1694,7 +1758,7 @@ export default function App() {
                             <div key={pregunta.id} className="border-b pb-4">
                               <p className="font-semibold text-gray-800">{pregunta.enunciado}</p>
                               <p className="text-xs text-gray-400 mb-2">
-                                Nivel {pregunta.nivel} • {pregunta.subtema || 'Sin subtema'}
+                                Nivel {pregunta.nivel} • Peso {pregunta.peso ?? defaultPesoForNivel(pregunta.nivel)} • {pregunta.subtema || 'Sin subtema'}
                               </p>
                               <div className="flex flex-wrap gap-2 text-xs text-gray-500 mb-3">
                                 {pregunta.opciones.map((opt) => (
@@ -1983,15 +2047,49 @@ export default function App() {
                   </div>
 
                   <div className="bg-white border border-gray-100 rounded-2xl p-6">
+                    <h4 className="text-xl font-bold mb-4">Desglose por nivel</h4>
+                    {resultData.desglosePorNivel && resultData.desglosePorNivel.length > 0 ? (
+                      <div className="space-y-4">
+                        {resultData.desglosePorNivel.map((nivel) => (
+                          <div key={nivel.nivel} className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="capitalize">{nivel.nivel.toLowerCase()}</span>
+                              <span className="font-semibold">
+                                {nivel.correctas}/{nivel.total} · {nivel.porcentaje}%
+                              </span>
+                            </div>
+                            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#00A8E8] rounded-full"
+                                style={{ width: `${nivel.porcentaje}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 text-sm">No hay datos suficientes por nivel.</p>
+                    )}
+                  </div>
+
+                  <div className="bg-white border border-gray-100 rounded-2xl p-6">
                     <h4 className="text-xl font-bold mb-4">Desglose por subtema</h4>
                     {resultData.desgloseSubtemas && resultData.desgloseSubtemas.length > 0 ? (
                       <div className="space-y-3">
                         {resultData.desgloseSubtemas.map((subtema) => (
-                          <div key={subtema.subtema} className="flex justify-between text-sm border-b pb-2">
-                            <span>{subtema.subtema}</span>
-                            <span className="font-semibold">
-                              {subtema.correctas}/{subtema.total}
-                            </span>
+                          <div key={subtema.subtema} className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>{subtema.subtema}</span>
+                              <span className="font-semibold">
+                                {subtema.correctas}/{subtema.total} · {subtema.porcentaje}%
+                              </span>
+                            </div>
+                            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#00A8E8] rounded-full"
+                                style={{ width: `${subtema.porcentaje}%` }}
+                              ></div>
+                            </div>
                           </div>
                         ))}
                       </div>

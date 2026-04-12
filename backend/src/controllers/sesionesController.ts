@@ -118,12 +118,30 @@ const finishSession = async (sessionId: string, userId: string) => {
     subtema: row.subtema as string,
     total: Number(row.total),
     correctas: Number(row.correctas),
+    porcentaje: row.total ? Math.round((Number(row.correctas) / Number(row.total)) * 100) : 0,
   }));
+
+  const nivelResult = await query(
+    "SELECT nivel_pregunta, COUNT(*)::int as total, SUM(CASE WHEN es_correcta THEN 1 ELSE 0 END)::int as correctas FROM respuestas_sesion WHERE sesion_id = $1 GROUP BY nivel_pregunta ORDER BY nivel_pregunta",
+    [sessionId]
+  );
+
+  const desglosePorNivel = nivelResult.rows.map((row) => {
+    const total = Number(row.total);
+    const correctas = Number(row.correctas);
+    return {
+      nivel: row.nivel_pregunta as "FACIL" | "MEDIO" | "ALTO",
+      total,
+      correctas,
+      porcentaje: total ? Math.round((correctas / total) * 100) : 0,
+    };
+  });
 
   return {
     resultado,
     tiempoEmpleadoSegundos: elapsedSeconds,
     desgloseSubtemas,
+    desglosePorNivel,
   };
 };
 
@@ -240,6 +258,7 @@ export const answerPregunta = async (req: AuthRequest, res: Response) => {
         resultado: finish.resultado,
         tiempoEmpleadoSegundos: finish.tiempoEmpleadoSegundos,
         desgloseSubtemas: finish.desgloseSubtemas,
+        desglosePorNivel: finish.desglosePorNivel,
       });
     }
 
@@ -295,6 +314,7 @@ export const answerPregunta = async (req: AuthRequest, res: Response) => {
         resultado: finish.resultado,
         tiempoEmpleadoSegundos: finish.tiempoEmpleadoSegundos,
         desgloseSubtemas: finish.desgloseSubtemas,
+        desglosePorNivel: finish.desglosePorNivel,
       });
     }
 
@@ -320,6 +340,7 @@ export const answerPregunta = async (req: AuthRequest, res: Response) => {
         resultado: finish.resultado,
         tiempoEmpleadoSegundos: finish.tiempoEmpleadoSegundos,
         desgloseSubtemas: finish.desgloseSubtemas,
+        desglosePorNivel: finish.desglosePorNivel,
       });
     }
 
@@ -360,6 +381,7 @@ export const finishSesion = async (req: AuthRequest, res: Response) => {
       resultado: finish.resultado,
       tiempoEmpleadoSegundos: finish.tiempoEmpleadoSegundos,
       desgloseSubtemas: finish.desgloseSubtemas,
+      desglosePorNivel: finish.desglosePorNivel,
     });
   } catch (error) {
     console.error(error);
