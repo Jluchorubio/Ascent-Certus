@@ -639,6 +639,8 @@ export default function App() {
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [resultData, setResultData] = useState<FinishPayload | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
   const [twoFaError, setTwoFaError] = useState<string | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
@@ -646,6 +648,7 @@ export default function App() {
   const [chartFilter, setChartFilter] = useState<string | null>(null);
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   const [adminTab, setAdminTab] = useState<'materias' | 'preguntas' | 'cuestionarios'>('materias');
   const [adminMaterias, setAdminMaterias] = useState<MateriaApi[]>([]);
@@ -1037,6 +1040,7 @@ export default function App() {
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoginError(null);
+    setRegisterSuccess(null);
 
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get('email') || '');
@@ -1057,6 +1061,38 @@ export default function App() {
       setActivePage('dashboard');
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'Error al iniciar sesión');
+    }
+  };
+
+  const handleRegister = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setRegisterError(null);
+    setRegisterSuccess(null);
+
+    const formData = new FormData(event.currentTarget);
+    const nombre = String(formData.get('nombre') || '');
+    const email = String(formData.get('email') || '');
+    const password = String(formData.get('password') || '');
+
+    if (!nombre.trim()) {
+      setRegisterError('El nombre es obligatorio.');
+      return;
+    }
+    if (!email.trim()) {
+      setRegisterError('El email es obligatorio.');
+      return;
+    }
+    if (password.length < 6) {
+      setRegisterError('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    try {
+      await api.register(nombre.trim(), email.trim(), password);
+      setRegisterSuccess('Cuenta creada correctamente. Ahora puedes iniciar sesión.');
+      setAuthMode('login');
+    } catch (error) {
+      setRegisterError(error instanceof Error ? error.message : 'Error creando la cuenta');
     }
   };
 
@@ -1305,39 +1341,114 @@ export default function App() {
         {activePage === 'login' ? (
           <div className="min-h-screen pt-32 px-4 bg-gray-50">
             <div className="max-w-md mx-auto bg-white p-10 rounded-3xl shadow-xl border border-gray-100">
-              <h2 className="text-3xl font-bold mb-6">Bienvenido de nuevo</h2>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    name="email"
-                    type="email"
-                    placeholder="pedro@colegio.edu.co"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-                  <input
-                    name="password"
-                    type="password"
-                    placeholder="••••••••"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
-                    required
-                  />
-                </div>
-                {loginError && <p className="text-sm text-red-500">{loginError}</p>}
-                <Button className="w-full pt-4" type="submit">
-                  Ingresar
-                </Button>
-              </form>
-              <button
-                onClick={() => setActivePage('landing')}
-                className="w-full text-center mt-6 text-sm text-gray-400 hover:text-gray-600"
-              >
-                Volver al inicio
-              </button>
+              {authMode === 'login' ? (
+                <>
+                  <h2 className="text-3xl font-bold mb-6">Bienvenido de nuevo</h2>
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <input
+                        name="email"
+                        type="email"
+                        placeholder="pedro@colegio.edu.co"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                      <input
+                        name="password"
+                        type="password"
+                        placeholder="••••••••"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                        required
+                      />
+                    </div>
+                    {loginError && <p className="text-sm text-red-500">{loginError}</p>}
+                    {registerSuccess && <p className="text-sm text-green-600">{registerSuccess}</p>}
+                    <Button className="w-full pt-4" type="submit">
+                      Ingresar
+                    </Button>
+                  </form>
+                  <div className="mt-6 flex items-center justify-between text-sm text-gray-400">
+                    <button
+                      onClick={() => {
+                        setAuthMode('register');
+                        setLoginError(null);
+                        setRegisterSuccess(null);
+                      }}
+                      className="text-[#00A8E8] font-semibold hover:text-[#007bb0]"
+                    >
+                      Crear cuenta
+                    </button>
+                    <button
+                      onClick={() => setActivePage('landing')}
+                      className="hover:text-gray-600"
+                    >
+                      Volver al inicio
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-3xl font-bold mb-6">Crear cuenta</h2>
+                  <form onSubmit={handleRegister} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre completo</label>
+                      <input
+                        name="nombre"
+                        type="text"
+                        placeholder="Nombre y apellido"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <input
+                        name="email"
+                        type="email"
+                        placeholder="correo@institucion.edu"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                      <input
+                        name="password"
+                        type="password"
+                        placeholder="Mínimo 6 caracteres"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#00A8E8] outline-none"
+                        minLength={6}
+                        required
+                      />
+                    </div>
+                    {registerError && <p className="text-sm text-red-500">{registerError}</p>}
+                    <Button className="w-full pt-4" type="submit">
+                      Crear cuenta
+                    </Button>
+                  </form>
+                  <div className="mt-6 flex items-center justify-between text-sm text-gray-400">
+                    <button
+                      onClick={() => {
+                        setAuthMode('login');
+                        setRegisterError(null);
+                      }}
+                      className="text-[#00A8E8] font-semibold hover:text-[#007bb0]"
+                    >
+                      Ya tengo cuenta
+                    </button>
+                    <button
+                      onClick={() => setActivePage('landing')}
+                      className="hover:text-gray-600"
+                    >
+                      Volver al inicio
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ) : (

@@ -42,6 +42,11 @@ export const api = {
         body: { email, password },
       }
     ),
+  register: (nombre: string, email: string, password: string) =>
+    request<{ ok: boolean; user: unknown }>('/auth/register', {
+      method: 'POST',
+      body: { nombre, email, password },
+    }),
   verify2FA: (userId: string, code: string) =>
     request<{ ok: boolean; user: unknown }>('/auth/verify-2fa', {
       method: 'POST',

@@ -88,6 +88,38 @@ export const login = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const register = async (req: AuthRequest, res: Response) => {
+  try {
+    const { nombre, email, password } = req.body as { nombre?: string; email?: string; password?: string };
+
+    if (!isNonEmpty(nombre)) {
+      return res.status(400).json({ message: "Nombre requerido" });
+    }
+    if (!isEmail(email || "")) {
+      return res.status(400).json({ message: "Email inválido" });
+    }
+    if (!isNonEmpty(password) || (password || "").length < 6) {
+      return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
+    }
+
+    const exists = await query("SELECT id FROM usuarios WHERE email = $1 LIMIT 1", [email]);
+    if (exists.rows.length > 0) {
+      return res.status(409).json({ message: "El email ya está registrado" });
+    }
+
+    const hash = await bcrypt.hash(password as string, 10);
+    const result = await query(
+      "INSERT INTO usuarios (nombre, email, password_hash, rol, activo) VALUES ($1, $2, $3, 'STUDENT', TRUE) RETURNING id, nombre, email, rol",
+      [nombre, email, hash]
+    );
+
+    return res.status(201).json({ ok: true, user: result.rows[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Error creando usuario" });
+  }
+};
+
 export const verify2FA = async (req: AuthRequest, res: Response) => {
   try {
     const { userId, code } = req.body as { userId?: string; code?: string };
