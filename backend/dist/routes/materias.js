@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const materiasController_1 = require("../controllers/materiasController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const roleGuard_1 = require("../middleware/roleGuard");
+const router = (0, express_1.Router)();
+router.get("/", authMiddleware_1.authMiddleware, materiasController_1.listMaterias);
+router.post("/", authMiddleware_1.authMiddleware, (0, roleGuard_1.roleGuard)("ADMIN"), materiasController_1.createMateria);
+router.patch("/:id", authMiddleware_1.authMiddleware, (0, roleGuard_1.roleGuard)("ADMIN"), materiasController_1.updateMateria);
+router.patch("/:id/toggle", authMiddleware_1.authMiddleware, (0, roleGuard_1.roleGuard)("ADMIN"), materiasController_1.toggleMateria);
+exports.default = router;
