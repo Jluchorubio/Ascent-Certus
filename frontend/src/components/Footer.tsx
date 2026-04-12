@@ -1,15 +1,16 @@
-﻿import { Mail, MapPin, Phone, CheckCircle2 } from 'lucide-react';
+import { Mail, MapPin, Phone } from 'lucide-react';
+import LogoMark from './LogoMark';
 
 const Footer = () => (
   <footer className="bg-[#0B1F2A] text-white">
     <div className="max-w-7xl mx-auto px-4 py-14 grid md:grid-cols-4 gap-10">
       <div>
-        <div className="flex items-center gap-2 mb-4">
-          <div className="bg-[#00A8E8] p-1.5 rounded-lg">
-            <CheckCircle2 className="text-white w-5 h-5" />
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/15 grid place-items-center">
+            <LogoMark className="h-6 w-6 text-white" />
           </div>
-          <span className="text-2xl font-bold tracking-tight text-[#00A8E8]">
-            Preicfes<span className="text-gray-400">.net</span>
+          <span className="text-2xl font-bold tracking-tight text-white">
+            Ascent Certus
           </span>
         </div>
         <p className="text-sm text-slate-300 leading-relaxed">
@@ -42,13 +43,13 @@ const Footer = () => (
         <h4 className="text-sm font-semibold uppercase tracking-widest text-slate-400 mb-4">Contacto</h4>
         <div className="space-y-3 text-sm text-slate-200">
           <div className="flex items-center gap-2">
-            <Mail size={16} /> soporte@preicfes.net
+            <Mail size={16} /> soporte@ascentcertus.com
           </div>
           <div className="flex items-center gap-2">
             <Phone size={16} /> +57 300 123 4567
           </div>
           <div className="flex items-center gap-2">
-            <MapPin size={16} /> Bogotá, Colombia
+            <MapPin size={16} /> Bogota, Colombia
           </div>
         </div>
       </div>
@@ -56,7 +57,7 @@ const Footer = () => (
 
     <div className="border-t border-white/10">
       <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col md:flex-row items-center justify-between text-xs text-slate-400">
-        <span>© {new Date().getFullYear()} Preicfes.net</span>
+        <span>© {new Date().getFullYear()} Ascent Certus</span>
         <span className="mt-2 md:mt-0">Resultados adaptativos y métricas en tiempo real.</span>
       </div>
     </div>

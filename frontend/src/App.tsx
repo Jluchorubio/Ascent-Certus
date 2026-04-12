@@ -210,7 +210,7 @@ const LandingPage = ({ onLoginClick }: LandingPageProps) => (
     <section className="max-w-7xl mx-auto px-4 py-16 flex flex-col lg:flex-row items-center gap-12">
       <div className="flex-1 text-center lg:text-left">
         <h1 className="text-6xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-          PREICFES <br />
+          ASCENT CERTUS <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00A8E8] to-blue-600">
             Estudia y practica
           </span>
@@ -327,10 +327,10 @@ const LandingPage = ({ onLoginClick }: LandingPageProps) => (
         </div>
         <div className="flex-1">
           <h2 className="text-4xl font-bold mb-6">
-            NOSOTROS <br /> <span className="text-[#00A8E8]">Preicfes.net</span>
+            NOSOTROS <br /> <span className="text-[#00A8E8]">Ascent Certus</span>
           </h2>
           <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-            Preicfes.net es una plataforma gratuita diseñada para ayudar a estudiantes que están
+            Ascent Certus es una plataforma gratuita diseñada para ayudar a estudiantes que están
             por terminar su educación secundaria. Nuestro objetivo es apoyarles en la preparación
             para el examen ICFES Saber 11°, ofreciendo una herramienta de práctica y evaluación de
             conocimientos de alto nivel.
