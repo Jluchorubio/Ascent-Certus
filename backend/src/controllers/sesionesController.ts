@@ -46,14 +46,14 @@ const pickQuestion = async (
   const exclude = excludeIds.length ? excludeIds : [];
 
   const result = await query(
-    "SELECT id, enunciado, nivel, opciones, subtema FROM preguntas WHERE materia_id = $1 AND activa = TRUE AND nivel = $2 AND NOT (id = ANY($3::uuid[])) ORDER BY random() LIMIT 1",
+    "SELECT id, enunciado, nivel, opciones, subtema FROM preguntas WHERE materia_id = $1 AND (activa IS NULL OR activa = TRUE) AND nivel = $2 AND NOT (id = ANY($3::uuid[])) ORDER BY random() LIMIT 1",
     [materiaId, nivel, exclude]
   );
 
   if (result.rows.length > 0) return result.rows[0];
 
   const fallback = await query(
-    "SELECT id, enunciado, nivel, opciones, subtema FROM preguntas WHERE materia_id = $1 AND activa = TRUE AND NOT (id = ANY($2::uuid[])) ORDER BY random() LIMIT 1",
+    "SELECT id, enunciado, nivel, opciones, subtema FROM preguntas WHERE materia_id = $1 AND (activa IS NULL OR activa = TRUE) AND NOT (id = ANY($2::uuid[])) ORDER BY random() LIMIT 1",
     [materiaId, exclude]
   );
 
@@ -168,7 +168,7 @@ export const startSesion = async (req: AuthRequest, res: Response) => {
 
     const cuestionario = cuestionarioResult.rows[0];
 
-    if (!cuestionario.activo) {
+    if (cuestionario.activo === false) {
       return res.status(400).json({ message: "Cuestionario inactivo" });
     }
 
@@ -178,6 +178,15 @@ export const startSesion = async (req: AuthRequest, res: Response) => {
     }
     if (cuestionario.fecha_fin && new Date(cuestionario.fecha_fin) < now) {
       return res.status(400).json({ message: "Cuestionario fuera de fecha" });
+    }
+
+    const preguntasCount = await query(
+      "SELECT COUNT(*)::int as total FROM preguntas WHERE materia_id = $1 AND (activa IS NULL OR activa = TRUE)",
+      [cuestionario.materia_id]
+    );
+
+    if (!preguntasCount.rows[0]?.total) {
+      return res.status(400).json({ message: "No se han colocado preguntas en este cuestionario." });
     }
 
     const sessionResult = await query(
@@ -279,7 +288,7 @@ export const answerPregunta = async (req: AuthRequest, res: Response) => {
     const currentCount = countResult.rows[0].total as number;
 
     const questionResult = await query(
-      "SELECT id, nivel, opciones, materia_id FROM preguntas WHERE id = $1 AND activa = TRUE",
+      "SELECT id, nivel, opciones, materia_id FROM preguntas WHERE id = $1 AND (activa IS NULL OR activa = TRUE)",
       [preguntaId]
     );
 

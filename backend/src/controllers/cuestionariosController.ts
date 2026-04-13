@@ -24,7 +24,19 @@ export const listCuestionarios = async (req: AuthRequest, res: Response) => {
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-    const result = await query(`SELECT * FROM cuestionarios ${where} ORDER BY creado_en DESC`, values);
+    const result = await query(
+      `SELECT c.*,
+        (
+          SELECT COUNT(*)::int
+          FROM preguntas p
+          WHERE p.materia_id = c.materia_id
+            AND (p.activa IS NULL OR p.activa = TRUE)
+        ) AS preguntas_disponibles
+       FROM cuestionarios c
+       ${where}
+       ORDER BY c.creado_en DESC`,
+      values
+    );
 
     return res.json({ cuestionarios: result.rows });
   } catch (error) {
@@ -130,7 +142,7 @@ export const toggleCuestionario = async (req: AuthRequest, res: Response) => {
     if (typeof activo === "boolean") {
       result = await query("UPDATE cuestionarios SET activo = $2 WHERE id = $1 RETURNING *", [id, activo]);
     } else {
-      result = await query("UPDATE cuestionarios SET activo = NOT activo WHERE id = $1 RETURNING *", [id]);
+      result = await query("UPDATE cuestionarios SET activo = NOT COALESCE(activo, TRUE) WHERE id = $1 RETURNING *", [id]);
     }
 
     if (result.rows.length === 0) {

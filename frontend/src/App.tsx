@@ -51,6 +51,7 @@ type Cuestionario = {
   nombre: string;
   cantidad_preguntas: number;
   tiempo_minutos: number;
+  preguntas_disponibles?: number;
 };
 
 type Opcion = {
@@ -91,6 +92,7 @@ type CuestionarioAdmin = {
   activo: boolean;
   fecha_inicio?: string | null;
   fecha_fin?: string | null;
+  preguntas_disponibles?: number;
 };
 
 type SesionPayload = {
@@ -154,7 +156,7 @@ type LandingPageProps = {
 
 type SubjectDashboardProps = {
   subject: Subject;
-  principal?: Cuestionario;
+  cuestionarios: Cuestionario[];
   stats: {
     bestScore: number;
     averageScore: number;
@@ -162,6 +164,7 @@ type SubjectDashboardProps = {
     lastLevel?: 'BAJO' | 'MEDIO' | 'ALTO';
   };
   onStartTest: (cuestionario: Cuestionario) => void;
+  sessionError?: string | null;
 };
 
 type AnalyticsViewProps = {
@@ -180,6 +183,17 @@ const CERTIFICATIONS = [
   'Cambridge',
   'STEM Ready',
   'Quality Learning',
+];
+
+const FALLBACK_COLORS = [
+  '#00A8E8',
+  '#10B981',
+  '#F59E0B',
+  '#6366F1',
+  '#EC4899',
+  '#14B8A6',
+  '#F97316',
+  '#3B82F6',
 ];
 
 const Button = ({
@@ -206,6 +220,37 @@ const Button = ({
     </button>
   );
 };
+
+type ToggleProps = {
+  active: boolean;
+  onClick?: () => void;
+  labelOn?: string;
+  labelOff?: string;
+};
+
+const StatusToggle = ({ active, onClick, labelOn = 'Activo', labelOff = 'Inactivo' }: ToggleProps) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={active}
+    className="flex items-center gap-3"
+  >
+    <span
+      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 ${
+        active ? 'bg-emerald-500' : 'bg-gray-200'
+      }`}
+    >
+      <span
+        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-300 ${
+          active ? 'translate-x-6' : 'translate-x-1'
+        }`}
+      />
+    </span>
+    <span className={`text-xs font-semibold ${active ? 'text-emerald-600' : 'text-gray-400'}`}>
+      {active ? labelOn : labelOff}
+    </span>
+  </button>
+);
 
 const LandingPage = ({ onLoginClick }: LandingPageProps) => (
   <div className="min-h-screen pt-20">
@@ -344,7 +389,7 @@ const LandingPage = ({ onLoginClick }: LandingPageProps) => (
   </div>
 );
 
-const SubjectDashboard = ({ subject, principal, stats, onStartTest }: SubjectDashboardProps) => (
+const SubjectDashboard = ({ subject, cuestionarios, stats, onStartTest, sessionError }: SubjectDashboardProps) => (
   <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
     <div className="flex items-center gap-3 mb-8">
       <div className="p-2 rounded-lg bg-gray-100 text-[#00A8E8]">{subject.icon}</div>
@@ -410,29 +455,58 @@ const SubjectDashboard = ({ subject, principal, stats, onStartTest }: SubjectDas
       </p>
     </div>
 
-    <div className="max-w-2xl mx-auto">
-      <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-lg transition-shadow ring-2 ring-blue-100">
-        <div className="text-center mb-6">
-          <h4 className="text-2xl font-bold mb-2">Prueba principal</h4>
-          <p className="text-gray-500 italic">Una sesión del examen saber 11°</p>
+    <div className="max-w-5xl mx-auto">
+      {sessionError && <p className="text-center text-sm text-red-500 mb-6">{sessionError}</p>}
+      {cuestionarios.length === 0 ? (
+        <div className="bg-white p-10 rounded-3xl shadow-sm border border-gray-100 text-center text-gray-500">
+          Aún no hay cuestionarios creados para este módulo.
         </div>
-        <div className="bg-blue-50/50 p-6 rounded-2xl text-sm text-gray-600 mb-6 text-center">
-          Es una prueba con mayor número de preguntas, muy similar al examen real.
+      ) : (
+        <div className="grid md:grid-cols-2 gap-6">
+          {cuestionarios.map((cuestionario) => {
+            const available = cuestionario.preguntas_disponibles;
+            const hasQuestions = available === undefined ? true : available > 0;
+            return (
+              <div
+                key={cuestionario.id}
+                className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-lg transition-shadow ring-2 ring-blue-100"
+              >
+                <div className="text-center mb-6">
+                  <h4 className="text-2xl font-bold mb-2">{cuestionario.nombre}</h4>
+                  <p className="text-gray-500 italic">Sesión adaptativa del módulo {subject.name}</p>
+                </div>
+                <div className="bg-blue-50/50 p-6 rounded-2xl text-sm text-gray-600 mb-6 text-center">
+                  Practica con preguntas adaptativas y mide tu progreso en tiempo real.
+                </div>
+                <div className="space-y-3 mb-6">
+                  <div className="flex justify-between text-sm py-2 border-b">
+                    <span>Cantidad de preguntas:</span>
+                    <span className="font-bold">{cuestionario.cantidad_preguntas}</span>
+                  </div>
+                  <div className="flex justify-between text-sm py-2 border-b">
+                    <span>Tiempo para la prueba:</span>
+                    <span className="font-bold">{cuestionario.tiempo_minutos} min</span>
+                  </div>
+                  {available !== undefined && (
+                    <div className="flex justify-between text-sm py-2 border-b">
+                      <span>Preguntas disponibles:</span>
+                      <span className="font-bold">{available}</span>
+                    </div>
+                  )}
+                </div>
+                <Button className="w-full" disabled={!hasQuestions} onClick={() => onStartTest(cuestionario)}>
+                  {hasQuestions ? 'Comenzar' : 'Cuestionario sin preguntas'}
+                </Button>
+                {!hasQuestions && (
+                  <p className="mt-3 text-xs text-center text-gray-400">
+                    No se han colocado preguntas en este cuestionario.
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
-        <div className="space-y-3 mb-8">
-          <div className="flex justify-between text-sm py-2 border-b">
-            <span>Cantidad de preguntas:</span>
-            <span className="font-bold">{principal ? principal.cantidad_preguntas : '---'}</span>
-          </div>
-          <div className="flex justify-between text-sm py-2 border-b">
-            <span>Tiempo para la prueba:</span>
-            <span className="font-bold">{principal ? `${principal.tiempo_minutos} min` : '---'}</span>
-          </div>
-        </div>
-        <Button className="w-full" disabled={!principal} onClick={() => principal && onStartTest(principal)}>
-          Comenzar
-        </Button>
-      </div>
+      )}
     </div>
   </div>
 );
@@ -643,6 +717,7 @@ export default function App() {
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
   const [twoFaError, setTwoFaError] = useState<string | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [chartFilter, setChartFilter] = useState<string | null>(null);
@@ -721,14 +796,18 @@ export default function App() {
 
   const loadMaterias = async () => {
     const data = await api.listMaterias();
-    const materias = (data.materias as MateriaApi[]).map((materia) => ({
-      id: materia.id,
-      name: materia.nombre,
-      descripcion: materia.descripcion || null,
-      icono: materia.icono || null,
-      color: materia.color || '#00A8E8',
-      icon: iconForMateria(materia),
-    }));
+    const materias = (data.materias as MateriaApi[]).map((materia, index) => {
+      const safeColor =
+        materia.color && materia.color.trim() ? materia.color.trim() : FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+      return {
+        id: materia.id,
+        name: materia.nombre,
+        descripcion: materia.descripcion || null,
+        icono: materia.icono || null,
+        color: safeColor,
+        icon: iconForMateria(materia),
+      };
+    });
     setSubjects(materias);
   };
 
@@ -843,7 +922,8 @@ export default function App() {
   const handleToggleMateria = async (materia: MateriaApi & { activa?: boolean }) => {
     setAdminError(null);
     try {
-      await api.toggleMateria(materia.id, typeof materia.activa === 'boolean' ? !materia.activa : undefined);
+      const isActive = materia.activa !== false;
+      await api.toggleMateria(materia.id, !isActive);
       await loadAdminMaterias();
     } catch (error) {
       setAdminError(error instanceof Error ? error.message : 'Error actualizando la materia');
@@ -959,7 +1039,8 @@ export default function App() {
   const handleTogglePregunta = async (pregunta: PreguntaAdmin) => {
     setAdminError(null);
     try {
-      await api.togglePregunta(pregunta.id, !pregunta.activa);
+      const isActive = pregunta.activa !== false;
+      await api.togglePregunta(pregunta.id, !isActive);
       if (adminSelectedMateriaId) {
         await loadAdminPreguntas(adminSelectedMateriaId);
       }
@@ -1030,7 +1111,8 @@ export default function App() {
   const handleToggleCuestionario = async (cuestionario: CuestionarioAdmin) => {
     setAdminError(null);
     try {
-      await api.toggleCuestionario(cuestionario.id, !cuestionario.activo);
+      const isActive = cuestionario.activo !== false;
+      await api.toggleCuestionario(cuestionario.id, !isActive);
       await loadAdminCuestionarios(cuestionario.materia_id);
     } catch (error) {
       setAdminError(error instanceof Error ? error.message : 'Error actualizando el cuestionario');
@@ -1137,6 +1219,7 @@ export default function App() {
     setResultData(null);
     setSelectedOptionId(null);
     setIsSubmittingAnswer(false);
+    setSessionError(null);
 
     try {
       const data = (await api.startSesion(cuestionario.id)) as SesionPayload;
@@ -1150,7 +1233,7 @@ export default function App() {
       setTimeRemaining(Math.max(0, Math.floor((endAt - Date.now()) / 1000)));
       setActivePage('test');
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : 'Error iniciando la sesión');
+      setSessionError(error instanceof Error ? error.message : 'Error iniciando el cuestionario');
     }
   };
 
@@ -1256,6 +1339,7 @@ export default function App() {
 
   useEffect(() => {
     if (!selectedSubject) return;
+    setSessionError(null);
     loadCuestionarios(selectedSubject.id);
   }, [selectedSubject]);
 
@@ -1288,7 +1372,6 @@ export default function App() {
     timeRemaining <= 180 ? 'text-yellow-500 bg-yellow-500/20 border-yellow-500/30' :
       'text-green-500 bg-green-500/20 border-green-500/30';
 
-  const principalCuestionario = cuestionarios.length > 0 ? cuestionarios[0] : undefined;
 
   if (!isAuthenticated) {
     if (is2FAPending) {
@@ -1684,20 +1767,18 @@ export default function App() {
                               <p className="font-semibold text-gray-800">{materia.nombre}</p>
                               <p className="text-sm text-gray-500">{materia.descripcion || 'Sin descripción'}</p>
                             </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleEditMateria(materia)}
-                                className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
-                              >
-                                Editar
-                              </button>
-                              <button
-                                onClick={() => handleToggleMateria(materia as MateriaApi & { activa?: boolean })}
-                                className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
-                              >
-                                Activar/Desactivar
-                              </button>
-                            </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEditMateria(materia)}
+                                  className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+                                >
+                                  Editar
+                                </button>
+                                <StatusToggle
+                                  active={materia.activa !== false}
+                                  onClick={() => handleToggleMateria(materia as MateriaApi & { activa?: boolean })}
+                                />
+                              </div>
                           </div>
                         ))}
                         {!adminMaterias.length && (
@@ -1890,12 +1971,10 @@ export default function App() {
                                 >
                                   Editar
                                 </button>
-                                <button
+                                <StatusToggle
+                                  active={pregunta.activa !== false}
                                   onClick={() => handleTogglePregunta(pregunta)}
-                                  className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
-                                >
-                                  Activar/Desactivar
-                                </button>
+                                />
                               </div>
                             </div>
                           ))}
@@ -2030,12 +2109,10 @@ export default function App() {
                                 >
                                   Editar
                                 </button>
-                                <button
+                                <StatusToggle
+                                  active={cuestionario.activo !== false}
                                   onClick={() => handleToggleCuestionario(cuestionario)}
-                                  className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
-                                >
-                                  Activar/Desactivar
-                                </button>
+                                />
                               </div>
                             </div>
                           ))}
@@ -2053,8 +2130,9 @@ export default function App() {
             {activePage === 'subject' && selectedSubject && (
               <SubjectDashboard
                 subject={selectedSubject}
-                principal={principalCuestionario}
+                cuestionarios={cuestionarios}
                 stats={computeStats(selectedSubject.id)}
+                sessionError={sessionError}
                 onStartTest={(cuestionario) => {
                   setSelectedSubject(selectedSubject);
                   startTest(cuestionario);

@@ -103,7 +103,7 @@ export const toggleMateria = async (req: AuthRequest, res: Response) => {
     if (typeof activa === "boolean") {
       result = await query("UPDATE materias SET activa = $2 WHERE id = $1 RETURNING *", [id, activa]);
     } else {
-      result = await query("UPDATE materias SET activa = NOT activa WHERE id = $1 RETURNING *", [id]);
+      result = await query("UPDATE materias SET activa = NOT COALESCE(activa, TRUE) WHERE id = $1 RETURNING *", [id]);
     }
 
     if (result.rows.length === 0) {
