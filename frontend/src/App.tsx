@@ -512,19 +512,54 @@ const SubjectDashboard = ({ subject, cuestionarios, stats, onStartTest, sessionE
 );
 
 const AnalyticsView = ({ subjects, historial, activeFilterId, onFilterChange }: AnalyticsViewProps) => {
-  const filteredHistorial = activeFilterId
-    ? historial.filter((item) => item.materia_id === activeFilterId)
-    : historial;
+  const groupedHistorial = useMemo(() => {
+    const map = new Map<string, HistorialItem[]>();
+    historial.forEach((item) => {
+      const list = map.get(item.materia_id) || [];
+      list.push(item);
+      map.set(item.materia_id, list);
+    });
 
-  const chartData = filteredHistorial.map((item, index) => ({
-    label: `Intento ${index + 1}`,
-    fecha: new Date(item.completado_en).toLocaleDateString('es-CO'),
-    [item.materia_id]: item.puntaje_numerico,
-  }));
+    map.forEach((list) => {
+      list.sort((a, b) => new Date(a.completado_en).getTime() - new Date(b.completado_en).getTime());
+    });
+
+    return map;
+  }, [historial]);
 
   const subjectsToShow = activeFilterId
     ? subjects.filter((s) => s.id === activeFilterId)
     : subjects;
+
+  const chartData = useMemo(() => {
+    if (activeFilterId) {
+      const list = groupedHistorial.get(activeFilterId) || [];
+      return list.map((item, index) => ({
+        label: `Intento ${index + 1}`,
+        fecha: new Date(item.completado_en).toLocaleDateString('es-CO'),
+        [activeFilterId]: item.puntaje_numerico,
+      }));
+    }
+
+    const maxLen = Array.from(groupedHistorial.values()).reduce(
+      (acc, list) => Math.max(acc, list.length),
+      0
+    );
+
+    return Array.from({ length: maxLen }, (_, index) => {
+      const entry: Record<string, number | string> = {
+        label: `Intento ${index + 1}`,
+      };
+
+      groupedHistorial.forEach((list, materiaId) => {
+        if (index < list.length) {
+          entry[materiaId] = list[index].puntaje_numerico;
+        }
+      });
+
+      return entry;
+    });
+  }, [activeFilterId, groupedHistorial]);
 
   return (
     <div className="bg-white p-10 rounded-3xl shadow-sm border border-gray-100 animate-in fade-in duration-700">
@@ -607,10 +642,15 @@ const AnalyticsView = ({ subjects, historial, activeFilterId, onFilterChange }: 
                   border: 'none',
                   boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
                 }}
-                formatter={(value, _name, props) => [
-                  value,
-                  `Nivel (${props?.payload?.fecha || ''})`,
-                ]}
+                labelFormatter={(label) => label}
+                formatter={(value, name, props) => {
+                  const subjectName = subjects.find((s) => s.id === name)?.name || 'Nivel';
+                  const fecha = (props?.payload as { fecha?: string } | undefined)?.fecha;
+                  if (activeFilterId) {
+                    return [value, `${subjectName}${fecha ? ` (${fecha})` : ''}`];
+                  }
+                  return [value, subjectName];
+                }}
               />
               {subjectsToShow.map((s) => (
                 <Line
