@@ -10,6 +10,8 @@ import { isEmail, isNonEmpty } from "../utils/validators";
 
 const cookieName = process.env.COOKIE_NAME || "access_token";
 const isProd = process.env.NODE_ENV === "production";
+const cookieSameSite = (process.env.COOKIE_SAMESITE as "lax" | "strict" | "none") || (isProd ? "none" : "lax");
+const cookieSecure = process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === "true" : isProd;
 
 export const login = async (req: AuthRequest, res: Response) => {
   try {
@@ -50,8 +52,8 @@ export const login = async (req: AuthRequest, res: Response) => {
 
       res.cookie(cookieName, token, {
         httpOnly: true,
-        sameSite: "lax",
-        secure: isProd,
+        sameSite: cookieSameSite,
+        secure: cookieSecure,
         maxAge: 2 * 60 * 60 * 1000,
       });
 
@@ -173,8 +175,8 @@ export const verify2FA = async (req: AuthRequest, res: Response) => {
 
     res.cookie(cookieName, token, {
       httpOnly: true,
-      sameSite: "lax",
-      secure: isProd,
+      sameSite: cookieSameSite,
+      secure: cookieSecure,
       maxAge: 2 * 60 * 60 * 1000,
     });
 
@@ -194,7 +196,7 @@ export const verify2FA = async (req: AuthRequest, res: Response) => {
 };
 
 export const logout = async (_req: AuthRequest, res: Response) => {
-  res.clearCookie(cookieName, { httpOnly: true, sameSite: "lax", secure: isProd });
+  res.clearCookie(cookieName, { httpOnly: true, sameSite: cookieSameSite, secure: cookieSecure });
   return res.json({ ok: true });
 };
 
