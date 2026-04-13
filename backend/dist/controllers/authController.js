@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.me = exports.logout = exports.verify2FA = exports.login = void 0;
+exports.me = exports.logout = exports.verify2FA = exports.register = exports.login = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const pool_1 = require("../db/pool");
@@ -68,6 +68,32 @@ const login = async (req, res) => {
     }
 };
 exports.login = login;
+const register = async (req, res) => {
+    try {
+        const { nombre, email, password } = req.body;
+        if (!(0, validators_1.isNonEmpty)(nombre)) {
+            return res.status(400).json({ message: "Nombre requerido" });
+        }
+        if (!(0, validators_1.isEmail)(email || "")) {
+            return res.status(400).json({ message: "Email inválido" });
+        }
+        if (!(0, validators_1.isNonEmpty)(password) || (password || "").length < 6) {
+            return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
+        }
+        const exists = await (0, pool_1.query)("SELECT id FROM usuarios WHERE email = $1 LIMIT 1", [email]);
+        if (exists.rows.length > 0) {
+            return res.status(409).json({ message: "El email ya está registrado" });
+        }
+        const hash = await bcryptjs_1.default.hash(password, 10);
+        const result = await (0, pool_1.query)("INSERT INTO usuarios (nombre, email, password_hash, rol, activo) VALUES ($1, $2, $3, 'STUDENT', TRUE) RETURNING id, nombre, email, rol", [nombre, email, hash]);
+        return res.status(201).json({ ok: true, user: result.rows[0] });
+    }
+    catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Error creando usuario" });
+    }
+};
+exports.register = register;
 const verify2FA = async (req, res) => {
     try {
         const { userId, code } = req.body;
