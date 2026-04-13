@@ -13,7 +13,7 @@ export const listCuestionarios = async (req: AuthRequest, res: Response) => {
     const values: unknown[] = [];
 
     if (!includeAll) {
-      conditions.push("activo = TRUE");
+      conditions.push("(activo IS NULL OR activo = TRUE)");
       conditions.push("(fecha_inicio IS NULL OR fecha_inicio <= NOW())");
       conditions.push("(fecha_fin IS NULL OR fecha_fin >= NOW())");
     }

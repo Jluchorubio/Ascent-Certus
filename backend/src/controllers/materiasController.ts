@@ -10,7 +10,7 @@ export const listMaterias = async (req: AuthRequest, res: Response) => {
 
     const sql = includeAll
       ? "SELECT * FROM materias ORDER BY creado_en DESC"
-      : "SELECT * FROM materias WHERE activa = TRUE ORDER BY creado_en DESC";
+      : "SELECT * FROM materias WHERE (activa IS NULL OR activa = TRUE) ORDER BY creado_en DESC";
 
     const result = await query(sql);
     return res.json({ materias: result.rows });
